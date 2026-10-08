@@ -4,29 +4,38 @@ Inventario de componentes electrónicos: stock con historial, escáner QR/códig
 
 Next.js 16 (App Router, Server Components, Server Actions) · Prisma 6 + PostgreSQL · Tailwind v4 · Motion · Recharts.
 
-## Desplegar sobre la versión anterior
+## Desplegar en Vercel
 
-Hazlo en este orden.
-
-1. **Descarga una copia** desde la app actual: Configuración → Exportar Inventario.
-2. **Variables de entorno en Vercel** (Project → Settings → Environment Variables):
+1. **Antes de nada, descarga una copia** desde la app que esté en producción: Configuración/Ajustes → Exportar.
+   Si la base de producción es nueva (por ejemplo, Neon recién creada), esa copia es la única forma de traer los datos.
+2. **Variables de entorno** (Project → Settings → Environment Variables):
 
    | Variable | Obligatoria | Para qué |
    | --- | --- | --- |
-   | `DATABASE_URL` | sí | ya la tienes |
-   | `ADMIN_PASSWORD` | sí | contraseña de entrada |
-   | `AUTH_SECRET` | sí | firma de la sesión, mínimo 32 caracteres: `openssl rand -base64 48` |
+   | `DATABASE_URL` | sí | Postgres (Neon). La crea la integración de Storage |
+   | `ADMIN_PASSWORD` | sí | contraseña de entrada; usa una larga, la URL es pública |
+   | `AUTH_SECRET` | sí | firma de la sesión. Aleatoria, 32+ caracteres: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
    | `CRON_SECRET` | no | protege `/api/cron/overdue`; Vercel lo envía solo |
    | `NOTIFY_WEBHOOK_URL` | no | webhook de Discord para el resumen de préstamos vencidos |
    | `NEXT_PUBLIC_APP_TZ` | no | por defecto `America/Bogota` |
 
-   Sin `ADMIN_PASSWORD` y `AUTH_SECRET` nadie puede entrar.
-3. **Reemplaza el código** del repositorio por el de esta carpeta, `npm install` y haz push.
-   Vercel ejecuta `npm run vercel-build`, que pone `provider = "postgresql"` en el esquema y aplica `prisma db push` **sin** `--accept-data-loss`: el esquema nuevo solo añade columnas y tablas, y si algún cambio futuro fuera destructivo el build se detiene en vez de borrar datos.
-4. Una sola vez, con el `DATABASE_URL` de producción en tu `.env`:
-   - `npm run db:backfill` crea las personas a partir de los préstamos antiguos.
-   - En la app: Ajustes → "Cargar variantes de ESP32".
+   Sin `ADMIN_PASSWORD` y `AUTH_SECRET` nadie puede entrar. Cambiar una variable exige un Redeploy.
+3. **Push a `main`.** Vercel ejecuta `npm run vercel-build`: pone `provider = "postgresql"` en el esquema, genera el cliente, aplica `prisma db push` **sin** `--accept-data-loss` y compila.
+   Si un cambio de esquema futuro fuera destructivo, el build se detiene en vez de borrar datos.
+4. En la app nueva: Ajustes → "Restaurar o importar" con la copia del paso 1, y "Cargar variantes de ESP32".
+   Si había préstamos, `npm run db:backfill` (con el `DATABASE_URL` de producción en `.env`) crea las personas.
 5. Inventario → Etiquetas QR: imprime y pega. Desde ahí el escáner ya sirve.
+
+### Reglas de dependencias (para que el build no se rompa)
+
+- **`@prisma/client` y `prisma` van en `dependencies`, con la misma versión exacta.** Si falta `@prisma/client`,
+  `prisma generate` lo instala por su cuenta durante el build en modo producción y de paso borra de
+  `node_modules` todo lo que esté en `devDependencies`. El síntoma en el log es la línea
+  `Installed the @prisma/client and prisma packages in your project`, seguida de `Cannot find module 'typescript'`
+  o `'@tailwindcss/postcss'`.
+- **Todo lo que usa `next build` va en `dependencies`**: TypeScript, Tailwind, `@types/*`. En `devDependencies` solo queda ESLint.
+- **TypeScript está fijado en 5.9.** No ejecutes `npm install typescript` sin versión: la 6 cambia valores por defecto.
+- No hace falta `NPM_CONFIG_PRODUCTION` ni `ignoreBuildErrors`.
 
 ## Desarrollo (SQLite)
 
