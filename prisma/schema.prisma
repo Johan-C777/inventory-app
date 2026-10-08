@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // en Vercel lo cambia scripts/use-db.mjs (ver package.json → vercel-build)
+  url      = env("DATABASE_URL")
+}
+
+// Sin `enum`: SQLite no los soporta. Los campos de estado son String y los valores
+// permitidos viven en src/lib/enums.ts (un solo lugar para zod, tipos y UI).
+// Todo lo nuevo es opcional o tiene default: la migración no toca datos existentes.
+
+model Component {
+  id               String   @id @default(uuid())
+  name             String
+  category         String
+  subcategory      String?
+  part_number      String?
+  value            String?
+  approximate_cost Float?
+  current_quantity Int      @default(0)
+  unit             String   @default("uds")
+  location         String?
+  min_stock        Int      @default(0)
+  description      String?
+  notes            String?
+  image_url        String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  // Maker
+  datasheet_url String?
+  mount_type    String? // THT, SMD, MODULO, MECANICO. Sin default: null = sin definir
+  package_type  String? // DIP-14, SOIC-8, 0805, TO-220
+  manufacturer  String?
+  barcode       String? // código de bolsa/fabricante, se aprende al escanear; unicidad en la action
+
+  // Stock inteligente
+  auto_reorder Boolean @default(true) // entra solo a la wishlist al bajar del mínimo
+  reorder_qty  Int? // cuánto pedir; null = reponer hasta 2× el mínimo
+
+  movements Movement[]
+  loans     Loan[]
+  projects  ProjectComponent[]
+  wishlist  WishlistItem[]
+  boards    ComponentBoard[]
+
+  @@index([category])
+  @@index([location])
+  @@index([barcode])
+}
+
+model Movement {
+  id           String   @id @default(uuid())
+  component_id String
+  type         String // COMPRA, DEVOLUCION, USO, PERDIDA, DANO, PRESTAMO, AJUSTE_MANUAL (con signo)
+  quantity     Int
+  date         DateTime @default(now())
+  notes        String?
+  source       String   @default("MANUAL") // MANUAL, SCAN, LOAN, WISHLIST, PROJECT
+
+  component Component @relation(fields: [component_id], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([component_id, date])
+}
+
+// Compañeros recurrentes para préstamos
+model Person {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  contact    String? // WhatsApp, correo
+  team       String?
+  created_at DateTime @default(now())
+
+  loans Loan[]
+}
+
+model Loan {
+  id                   String    @id @default(uuid())
+  component_id         String
+  quantity             Int
+  person               String // nombre visible; se conserva para préstamos antiguos
+  borrower_id          String?
+  loan_date            DateTime  @default(now())
+  expected_return_date DateTime?
+  actual_return_date   DateTime?
+  status               String    @default("PRESTADO") // PRESTADO, DEVUELTO, PERDIDO
+  notes                String?
+  reminded_at          DateTime? // último aviso enviado por el cron
+
+  component Component @relation(fields: [component_id], references: [id], onDelete: Cascade)
+  borrower  Person?   @relation(fields: [borrower_id], references: [id], onDelete: SetNull)
+
+  @@index([status, expected_return_date])
+  @@index([borrower_id])
+}
+
+model WishlistItem {
+  id              String   @id @default(uuid())
+  name            String
+  category        String
+  quantity        Int      @default(1)
+  priority        String   @default("MEDIA") // BAJA, MEDIA, ALTA, URGENTE
+  estimated_price Float?
+  store           String?
+  url             String?
+  reason          String?
+  status          String   @default("PENDIENTE") // PENDIENTE, COMPRADO, DESCARTADO
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  // Enlace al inventario: permite "comprado → ingresar al stock" en un clic
+  component_id   String?
+  auto_generated Boolean @default(false)
+
+  component Component? @relation(fields: [component_id], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([component_id, status])
+}
+
+// Placas / microcontroladores (ESP32-S3, ESP32-C3, ...)
+model Board {
+  id            String  @id @default(uuid())
+  name          String  @unique // "ESP32-S3 DevKitC-1"
+  family        String // "ESP32"
+  mcu           String? // "ESP32-S3-WROOM-1-N16R8"
+  logic_voltage Float? // 3.3
+  notes         String?
+
+  components ComponentBoard[]
+  projects   Project[]
+}
+
+// Compatibilidad componente ↔ placa
+model ComponentBoard {
+  component_id String
+  board_id     String
+  note         String? // "requiere level shifter", "solo ADC1"
+
+  component Component @relation(fields: [component_id], references: [id], onDelete: Cascade)
+  board     Board     @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@id([component_id, board_id])
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  kind     String    @default("ELECTRONICO") // ELECTRONICO, MECANICO, FIRMWARE, MIXTO
+  status   String      @default("ACTIVO") // IDEA, ACTIVO, PAUSADO, TERMINADO
+  board_id String?
+  repo_url String?
+  due_date DateTime?
+
+  board      Board?             @relation(fields: [board_id], references: [id], onDelete: SetNull)
+  components ProjectComponent[]
+  prints     PrintPart[]
+}
+
+model ProjectComponent {
+  id            String  @id @default(uuid())
+  project_id    String
+  component_id  String
+  quantity      Int     @default(1)
+  print_part_id String? // herraje de una pieza concreta (insertos M3, tornillos)
+
+  project    Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  component  Component  @relation(fields: [component_id], references: [id], onDelete: Cascade)
+  print_part PrintPart? @relation(fields: [print_part_id], references: [id], onDelete: SetNull)
+
+  @@unique([project_id, component_id])
+}
+
+// Piezas impresas en 3D de un proyecto, con iteraciones de prueba
+model PrintPart {
+  id             String      @id @default(uuid())
+  project_id     String
+  name           String
+  iteration      Int         @default(1) // v1, v2... de la pieza de prueba
+  quantity       Int         @default(1)
+  material       String? // PLA, PETG, ABS, ASA, TPU
+  printer        String? // "Creality K1C"
+  filament_grams Float?
+  print_minutes  Int?
+  file_url       String? // STL / 3MF / enlace al modelo
+  status         String   @default("PENDIENTE") // PENDIENTE, IMPRIMIENDO, IMPRESA, FALLIDA, VALIDADA
+  notes          String?
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+
+  project  Project            @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  hardware ProjectComponent[]
+
+  @@index([project_id])
+}

@@ -1,0 +1,260 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Tokens con nombres de shadcn/ui: `npx shadcn@latest add <componente>` encaja sin tocar nada. */
+:root {
+  color-scheme: dark;
+
+  --void: #070a10;
+  --hull: #0c1119;
+  --plate: #131b28;
+  --line: #1f2b3d;
+  --silk: #e4ecf7;
+  --dim: #8696b0;
+  --ion: #56ccff;
+  --thruster: #ff8f54;
+  --ok: #43e5a0;
+  --warn: #ffcb45;
+  --danger: #ff5468;
+
+  --background: var(--void);
+  --foreground: var(--silk);
+  --card: var(--hull);
+  --card-foreground: var(--silk);
+  --popover: #0f1622;
+  --popover-foreground: var(--silk);
+  --primary: var(--ion);
+  --primary-foreground: #03131d;
+  --secondary: var(--plate);
+  --secondary-foreground: var(--silk);
+  --muted: var(--plate);
+  --muted-foreground: var(--dim);
+  --accent: var(--thruster);
+  --accent-foreground: #1d0b02;
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: #283650;
+  --ring: var(--ion);
+  --radius: 0.25rem;
+}
+
+@theme inline {
+  --font-sans: var(--ff-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--ff-display), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-plate: var(--plate);
+  --color-hull: var(--hull);
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: var(--radius);
+
+  --animate-boot: boot 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-sweep: sweep 1.6s linear infinite;
+  --animate-alarm: alarm 1.8s ease-in-out infinite;
+  --animate-scanline: scanline 2.4s ease-in-out infinite;
+
+  @keyframes boot {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes sweep {
+    to { background-position: -200% 0; }
+  }
+  @keyframes alarm {
+    50% { opacity: 0.45; }
+  }
+  @keyframes scanline {
+    0%, 100% { top: 8%; }
+    50% { top: 92%; }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    background: var(--void);
+  }
+  body {
+    min-height: 100dvh;
+    background: var(--void);
+    color: var(--silk);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Cuadrícula de plano + dos focos: le da algo que desenfocar al vidrio */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(52rem 34rem at 8% -8%, color-mix(in oklab, var(--ion) 15%, transparent), transparent 62%),
+      radial-gradient(44rem 30rem at 104% 108%, color-mix(in oklab, var(--thruster) 10%, transparent), transparent 60%),
+      linear-gradient(color-mix(in oklab, var(--line) 42%, transparent) 1px, transparent 1px) 0 0 / 100% 36px,
+      linear-gradient(90deg, color-mix(in oklab, var(--line) 42%, transparent) 1px, transparent 1px) 0 0 / 36px 100%;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--ion) 35%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ion);
+    outline-offset: 2px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--input) transparent;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Panel HUD: esquinas en chaflán, vidrio y borde en gradiente ion → thruster.
+     El borde va en ::before con máscara para que el fondo siga siendo translúcido. */
+  .hud {
+    --cut: 14px;
+    position: relative;
+    isolation: isolate;
+    background: color-mix(in oklab, var(--hull) 80%, transparent);
+    backdrop-filter: blur(16px) saturate(1.25);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .hud::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      140deg,
+      color-mix(in oklab, var(--hud-a, var(--ion)) 62%, transparent) 0%,
+      var(--line) 24%,
+      var(--line) 76%,
+      color-mix(in oklab, var(--hud-b, var(--thruster)) 50%, transparent) 100%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  /* La máscara no dibuja las diagonales del chaflán: van aparte */
+  .hud::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, transparent 50%, color-mix(in oklab, var(--hud-a, var(--ion)) 62%, transparent) 50%, color-mix(in oklab, var(--hud-a, var(--ion)) 62%, transparent) calc(50% + 1.4px), transparent calc(50% + 1.4px)) top left / var(--cut) var(--cut) no-repeat,
+      linear-gradient(135deg, transparent calc(50% - 1.4px), color-mix(in oklab, var(--hud-b, var(--thruster)) 50%, transparent) calc(50% - 1.4px), color-mix(in oklab, var(--hud-b, var(--thruster)) 50%, transparent) 50%, transparent 50%) bottom right / var(--cut) var(--cut) no-repeat;
+  }
+  .hud-danger { --hud-a: var(--danger); --hud-b: var(--danger); }
+  .hud-warn { --hud-a: var(--warn); --hud-b: var(--warn); }
+  .hud-quiet { --hud-a: var(--line); --hud-b: var(--line); }
+
+  /* Chaflán pequeño para botones y chips */
+  .cut-sm {
+    clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  }
+
+  /* Esqueleto de carga con barrido */
+  .skeleton {
+    background: linear-gradient(100deg, var(--plate) 30%, color-mix(in oklab, var(--ion) 12%, var(--plate)) 50%, var(--plate) 70%) 0 0 / 200% 100%;
+    animation: var(--animate-sweep);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Secuencia de arranque del dashboard: un solo momento orquestado, sin JS */
+  .boot > * {
+    animation: var(--animate-boot);
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  .field {
+    width: 100%;
+    height: 2.5rem;
+    padding: 0 0.75rem;
+    background: color-mix(in oklab, var(--void) 70%, transparent);
+    border: 1px solid var(--input);
+    border-radius: var(--radius-md);
+    color: var(--silk);
+    font: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  textarea.field {
+    height: auto;
+    padding: 0.6rem 0.75rem;
+    resize: vertical;
+  }
+  .field::placeholder {
+    color: color-mix(in oklab, var(--dim) 65%, transparent);
+  }
+  .field:hover {
+    border-color: color-mix(in oklab, var(--ion) 40%, var(--input));
+  }
+  .field:focus-visible {
+    outline: none;
+    border-color: var(--ion);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ion) 22%, transparent);
+  }
+  select.field {
+    appearance: none;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238696b0' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+  }
+  select.field option {
+    background: var(--popover);
+  }
+
+  .num {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+}
+
+@media print {
+  body { background: #fff; color: #000; }
+  body::before, .no-print { display: none !important; }
+}
